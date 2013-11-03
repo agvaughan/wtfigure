@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<!--- file:///Users/vaughana/wtfigure/canvas_test_0.2.html --->
+<html>
+  <head>
+    <title>Canvas from scratch</title>
+    <meta charset="utf-8">
+
+    <script type='text/javascript' id='lt_ws' src='http://localhost:63979/socket.io/lighttable/ws.js'></script>
+    <script src="scripts/jquery-1.10.2.js"></script>
+
+    <script>
+      console.log('-----------------Hello------------------');
+
+
+      $(document).ready(function() {
+
+        console.log('Document ready.');
+
+
+        canvas1 = document.getElementById("image1");
+        canvas2 = document.getElementById("image2");
+        imageCanvases = [canvas1,canvas2];
+
+        for (canvas in imageCanvases){
+          console.log('canvas!');
+          };
+
+        canvas1 = document.getElementById("image1");
+        canvas1.ctx = canvas1.getContext("2d");
+        canvas1.canvasOffset = $(canvas1).offset();
+        canvas1.canvasOffset.top = canvas1.canvasOffset.top-8; // todo:: figure out why the hell this is necessary.
+        canvas1.image = new Image();
+        canvas1.image.src = "./Fig3.1.png";
+        canvas1.image.src = "./Ferret.jpg";
+        canvas1.subImage = new Image();
+        canvas1.selectionExists = 0;
+        canvas1.currentlyDragging = 0;
+
+        canvas2 = document.getElementById("image2");
+        canvas2.image = new Image();
+        canvas2.image.src = "./Fig3.1.png";
+        canvas2.image.src = "./Ferret.jpg";
+        canvas2.canvasOffset = $(canvas2).offset();
+        canvas2.canvasOffset.top = canvas2.canvasOffset.top - 500; // todo:: figure out why the hell this is necessary.
+        canvas2.ctx = canvas2.getContext("2d");
+        canvas2.subImage = new Image();
+        canvas2.selectionExists = 0;
+        canvas2.currentlyDragging = 0;
+
+        canvas3 = document.getElementById("image_diference");
+        canvas3.ctx = canvas3.getContext("2d");
+
+
+
+
+        // load and plot images
+        $(canvas1.image).load(function() {
+          console.log('loaded canvas image 1')
+          canvas1.ctx.drawImage(canvas1.image, 0, 0);
+        });
+
+        $(canvas2.image).load(function() {
+          console.log('loaded canvas image 2')
+          canvas2.ctx.drawImage(canvas2.image, 0, 0);
+        });
+
+
+        // Mousedown events
+        $(canvas1).mousedown(function(e) {
+          canvas1.downX = Math.floor(e.pageX-1.25*canvas1.canvasOffset.left);
+          canvas1.downY = Math.floor(e.pageY-1.25*canvas1.canvasOffset.top);
+          canvas2.downX = canvas1.downX + 0 ;
+          canvas2.downY = canvas1.downY + 0;
+          canvas1.currentlyDragging = 1;
+
+          //          startSelection(canvas2,e)
+
+        });  // end $(canvas).mousedown(function(e) {
+
+        $(canvas2).mousedown(function(e) {
+
+          newDownX = Math.floor(e.pageX) - canvas2.subImage.width;        // -1.25*canvas2.canvasOffset.left);
+          newDownY = Math.floor(e.pageY - 400) - canvas2.subImage.height; // -1.25*canvas2.canvasOffset.top); // /arrgh, wtf is up with these offsets.
+          diffX    = canvas2.downX - newDownX;
+          diffY    = canvas2.downY - newDownY;
+
+          canvas2.downX = canvas2.downX - diffX;
+          canvas2.downY = canvas2.downY - diffY;
+          canvas2.upX   = canvas2.upX - diffX;
+          canvas2.upY   = canvas2.upY - diffY;
+
+          canvas2.currentlyDragging = 1;
+          dragSelection(canvas2,e)
+          refreshCanvas3();
+
+
+        });  // end $(canvas).mousedown(function(e) {
+
+
+        // mousemove events.
+        $(canvas1).mousemove(function(e) {
+          if (canvas1.currentlyDragging) {
+            canvas1.upX = Math.floor(e.pageX-1.25*canvas1.canvasOffset.left);
+            canvas1.upY = Math.floor(e.pageY-1.25*canvas1.canvasOffset.top);
+            canvas2.upX = canvas1.upX;
+            canvas2.upY = canvas1.upY ;
+            dragSelection(canvas1,e)
+            dragSelection(canvas2,e)
+            refreshCanvas3();
+          }
+        });
+
+        $(canvas2).mousemove(function(e) {
+          if (canvas2.currentlyDragging) {
+
+            newUpX = Math.floor(e.pageX); // -1.25*canvas2.canvasOffset.left);
+            newUpY = Math.floor(e.pageY - 400); // -1.25*canvas2.canvasOffset.top); // /arrgh, wtf is up with these offsets.
+            diffX = canvas2.upX - newUpX;
+            diffY = canvas2.upY - newUpY;
+
+            canvas2.downX = canvas2.downX - diffX;
+            canvas2.downY = canvas2.downY - diffY;
+            canvas2.upX   = canvas2.upX - diffX;
+            canvas2.upY   = canvas2.upY - diffY;
+            dragSelection(canvas2,e)
+            refreshCanvas3();
+          }
+        });
+
+        function dragSelection(canvas,e){
+
+          //console.log('in dragselection')
+          //console.log(canvas)
+          //console.log(canvas.ctx)
+          //redraw original image
+          canvas.ctx.clearRect(0,0, canvas.width, canvas.height);
+          canvas.ctx.drawImage(canvas.image, 0, 0);
+          //console.log(image)
+
+          // everything is off by 10 pixels for some reason I don't understand.
+          //canvas.upX = Math.floor(e.pageX-1.25*canvas.canvasOffset.left);
+          //canvas.upY = Math.floor(e.pageY-1.25*canvas.canvasOffset.top);
+
+          // this should eventually turn into the selection area
+          canvas.selectionArea = [canvas.downX,canvas.downY,canvas.upX-canvas.downX | 1,canvas.upY-canvas.downY | 1]; // x y w h
+          //console.log('selectionArea')
+          //console.log(selectionArea)
+
+          // get image data
+          canvas.subImage = canvas.ctx.getImageData(canvas.selectionArea[0],canvas.selectionArea[1],canvas.selectionArea[2],canvas.selectionArea[3]);
+
+          // draw bounding rectangle
+          canvas.ctx.strokeStyle = "#f00";
+          canvas.ctx.strokeRect(canvas.selectionArea[0], canvas.selectionArea[1], canvas.selectionArea[2], canvas.selectionArea[3]);
+
+          // start points for the subimage on the canvas
+          var subsetX = canvas.image.width + 10 | 0;
+          var subsetY = 1;
+          // plot the subimage and a rectangle around it.
+          canvas.ctx.putImageData(canvas.subImage, subsetX, subsetY);
+          canvas.ctx.strokeRect(subsetX,subsetY,Math.abs(canvas.selectionArea[2]), Math.abs(canvas.selectionArea[3]));
+
+          $('#x1').val(canvas.selectionArea[0]);
+          $('#y1').val(canvas.selectionArea[1]);
+          $('#w').val(canvas.selectionArea[2]);
+          $('#h').val(canvas.selectionArea[3]);
+
+          canvas.selectionExists = 1;
+
+        };
+
+        // mouse up events.
+        $(canvas1).mouseup(function(e) {
+          canvas1.currentlyDragging = 0;
+          canvas2.currentlyDragging = 0;
+          refreshCanvas3();
+
+        });
+
+        $(canvas2).mouseup(function(e) {
+          canvas1.currentlyDragging = 0;
+          canvas2.currentlyDragging = 0;
+          refreshCanvas3();
+        });
+
+
+        function refreshCanvas3() {
+
+          border = 30;
+
+          canvas3.ctx.clearRect(0,0, canvas3.width, canvas3.height);
+
+          canvas3.subImage1 = canvas1.subImage;
+          canvas3.subImage2 = canvas2.subImage;
+
+        // first subimage
+        if (typeof (canvas1.subImage) != 'undefined') {
+            canvas3.ctx.putImageData(canvas1.subImage, 0, 0 + border);
+            canvas3.ctx.fillStyle = "#ff5e99";
+            canvas3.ctx.fillText("Image 1", 0, border-10);
+            canvas3.ctx.strokeStyle = "#f00";
+            canvas3.ctx.strokeRect(0,border, canvas1.subImage.width, canvas1.subImage.height);
+
+        };
+
+        // second subimage
+        if (typeof (canvas1.subImage) != 'undefined') {
+            canvas3.ctx.putImageData(canvas2.subImage, 0, canvas1.subImage.height + 2*border);
+            canvas3.ctx.fillStyle = "#5eff99"
+            canvas3.ctx.fillText("Image 2", 0, canvas1.subImage.height + 2*border-10 );
+            canvas3.ctx.strokeStyle = "#f00";
+            canvas3.ctx.strokeRect(0,canvas1.subImage.height + 2*border , canvas2.subImage.width, canvas2.subImage.height);
+
+        };
+
+          // plot difference image
+          if (typeof(canvas3.subImage1) != 'undefined' && typeof(canvas3.subImage2) != 'undefined') {
+
+
+            // copy data
+            //             function copyImageData(ctx, src)
+            //             {
+            //               var dst = ctx.createImageData(src.width, src.height);
+            //               dst.data.set(src.data);
+            //               return dst;
+            //             }
+
+            console.log('------debug')
+            consoleReport('canvas1.subImage')
+            consoleReport('canvas1.subImage.data')
+
+            thisSubImage1 = canvas3.ctx.createImageData(canvas3.subImage1.width, canvas3.subImage1.height);
+            thisSubImage2 = canvas3.ctx.createImageData(canvas3.subImage2.width, canvas3.subImage2.height);
+            thisSubImage1.data.set(canvas1.subImage.data);
+            thisSubImage2.data.set(canvas2.subImage.data);
+            rgbImage     = canvas3.ctx.createImageData(canvas3.subImage1.width, canvas3.subImage1.height);
+            rgbImage.data.set(canvas1.subImage.data);
+            diffImage     = canvas3.ctx.createImageData(canvas3.subImage1.width, canvas3.subImage1.height);
+            diffImage.data.set(canvas1.subImage.data);
+
+
+            // rgb encoding
+            for (var i=0; i < rgbImage.data.length; i=i+4){
+              rgbImage.data[i]   = thisSubImage1.data[i]/3 + thisSubImage1.data[i+2]/3 + thisSubImage1.data[i+3]/3; // average of image1
+              rgbImage.data[i+1] = thisSubImage2.data[i]/3 + thisSubImage2.data[i+2]/3 + thisSubImage2.data[i+3]/3; // average of image2
+              rgbImage.data[i+2] = Math.abs( rgbImage.data[i] / 2+ rgbImage.data[i+1]/2 ); // average
+            };
+
+            // difference image
+            for (var i=0; i < diffImage.data.length; i++){
+              diffImage.data[i]   = thisSubImage1.data[i] - thisSubImage2.data[i] + 128; //
+              diffImage.data[i+1] = thisSubImage2.data[i+1] - thisSubImage1.data[i+1] + 128; //
+              diffImage.data[i+2] = thisSubImage1.data[i+2] - thisSubImage2.data[i+2] + 128; //
+            };
+ 
+
+      // draw difference image
+            canvas3.ctx.putImageData(rgbImage, canvas1.subImage.width + border, border);
+             canvas3.ctx.font =  "10pt Arial";
+
+            //
+            canvas3.ctx.fillStyle = "#ff5e99"
+            canvas3.ctx.fillText("Image 1", canvas1.subImage.width + border, border - 16);
+            canvas3.ctx.fillStyle = "#5eff99"
+            canvas3.ctx.fillText("Image 2", canvas1.subImage.width + border, border - 4);
+            canvas3.ctx.strokeRect(canvas1.subImage.width + border, border,canvas2.subImage.width, canvas2.subImage.height);
+
+            //
+            canvas3.ctx.putImageData(diffImage, canvas1.subImage.width + border,canvas1.subImage.height + 2*border);
+            canvas3.ctx.font =  "12pt Arial";
+            canvas3.ctx.fillStyle = "#ffffff";
+            canvas3.ctx.fillText("Difference: Image 1 - 2", canvas1.subImage.width + border, canvas1.subImage.height + 2*border - 10);
+            canvas3.ctx.strokeRect(canvas1.subImage.width + border,canvas1.subImage.height + 2*border, canvas2.subImage.width, canvas2.subImage.height);
+
+          };
+
+        };
+
+        function consoleReport(thing) {
+          console.log(thing + ' :: ' + eval(thing) + ' -->')
+          console.log(eval(thing))
+        };
+
+      });
+
+
+
+
+    </script>
+  </head>
+
+  <body>
+    <p style="color:white">Image 1</p>
+    <canvas id="image1" width="1000" height="300">    </canvas>
+    <p style="color:white">Image 2</p>
+    <canvas id="image2" width="1000" height="300">    </canvas>
+    <p style="color:white">Image difference</p>
+    <canvas id="image_diference" width="1000" height="600">    </canvas>
+
+    <!--
+    <table style="margin-top: 1em;">
+      <thead>
+        <tr>
+          <th colspan="2" style="font-size: 110%; font-weight: bold; text-align: left; padding-left: 0.1em;">
+            Coordinates
+          </th>
+          <th colspan="2" style="font-size: 110%; font-weight: bold; text-align: left; padding-left: 0.1em;">
+            Dimensions
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="width: 10%;"><b>X<sub>1</sub>:</b></td>
+          <td style="width: 30%;"><input type="text" id="x1" value="-" /></td>
+          <td style="width: 20%;"><b>Width:</b></td>
+          <td><input type="text" value="-" id="w" /></td>
+        </tr>
+        <tr>
+          <td><b>Y<sub>1</sub>:</b></td>
+          <td><input type="text" id="y1" value="-" /></td>
+          <td><b>Height:</b></td>
+          <td><input type="text" id="h" value="-" /></td>
+        </tr>
+        <tr>
+          <td><b>X<sub>2</sub>:</b></td>
+          <td><input type="text" id="x2" value="-" /></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td><b>Y<sub>2</sub>:</b></td>
+          <td><input type="text" id="y2" value="-" /></td>
+          <td></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table> -->
+  </body>
+</html>
